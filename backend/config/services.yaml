@@ -1,0 +1,62 @@
+parameters:
+    llm.timeout: '%env(float:LLM_TIMEOUT)%'
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/Entity/'
+            - '../src/Enum/'
+            - '../src/Doctrine/'
+            - '../src/Http/'
+            - '../src/Llm/Exception/'
+            - '../src/Social/Exception/'
+            - '../src/Message/'
+            - '../src/Kernel.php'
+
+    # Lock su MySQL (nessun Redis): usato dallo Scheduler perche' un solo tick parta per minuto
+    lock.store.postpickr:
+        class: Symfony\Component\Lock\Store\DoctrineDbalStore
+        arguments: ['@doctrine.dbal.default_connection']
+
+    lock.factory.postpickr:
+        class: Symfony\Component\Lock\LockFactory
+        arguments: ['@lock.store.postpickr']
+
+    App\Scheduler\MainSchedule:
+        arguments:
+            $lockFactory: '@lock.factory.postpickr'
+
+    # Storage media su disco (public/uploads)
+    App\Media\LocalMediaStorage:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/public/uploads'
+            $publicBaseUrl: '%env(MEDIA_PUBLIC_BASE_URL)%'
+
+    App\Media\MediaStorageInterface: '@App\Media\LocalMediaStorage'
+
+    # Adapter LLM (uno per provider)
+    App\Llm\AnthropicLlmClient:
+        arguments:
+            $apiKey: '%env(LLM_API_KEY)%'
+            $model: '%env(LLM_MODEL)%'
+            $timeout: '%llm.timeout%'
+
+    App\Llm\GeminiLlmClient:
+        arguments:
+            $apiKey: '%env(LLM_API_KEY)%'
+            $model: '%env(LLM_MODEL)%'
+            $timeout: '%llm.timeout%'
+
+    # Provider attivo: Gemini (per cambiare provider basta cambiare questo alias)
+    App\Llm\LlmClientInterface: '@App\Llm\GeminiLlmClient'
+
+    # Adapter social (uno per piattaforma)
+    App\Social\InstagramPublisher:
+        arguments:
+            $graphBase: '%env(IG_GRAPH_BASE)%'
+            $graphVersion: '%env(IG_GRAPH_VERSION)%'

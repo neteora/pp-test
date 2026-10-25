@@ -1,0 +1,20 @@
+# Sviluppo: caricato in automatico da "docker compose" insieme a docker-compose.yml.
+services:
+  app:
+    volumes:
+      - ./backend:/var/www/html
+    environment:
+      APP_ENV: dev
+      CORS_ALLOW_ORIGIN: "^http://localhost:8097$"
+ 
+  frontend:
+    build: !reset null
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    volumes:
+      - ./frontend:/app
+    environment:
+      VITE_API_URL: http://localhost:8095
+    ports: !override
+      - "8097:8081"

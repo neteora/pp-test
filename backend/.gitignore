@@ -1,0 +1,14 @@
+/.env.local
+/.env.local.php
+/.env.*.local
+
+/vendor/
+/var/
+
+# PHPUnit
+/.phpunit.result.cache
+/.phpunit.cache/
+
+/public/uploads/
+
+/config/jwt/*.pem

@@ -1,0 +1,44 @@
+framework:
+    messenger:
+        # Coda su MySQL (transport Doctrine). Le tabelle si creano con un passo esplicito:
+        # bin/console messenger:setup-transports  (auto_setup disattivato).
+        failure_transport: failed_async
+
+        transports:
+            # Distribuzione dei post in scadenza (chunk) a partire dal tick dello Scheduler
+            async:
+                dsn: 'doctrine://default'
+                options: { queue_name: async, auto_setup: false }
+                failure_transport: failed_async
+                retry_strategy: { max_retries: 3, delay: 2000, multiplier: 2 }
+
+            # Una coda per piattaforma: un blocco/rate limit di una non rallenta le altre.
+            # Aggiungere una piattaforma = aggiungere un transport publish_<platform> + un adapter.
+            publish_instagram:
+                dsn: 'doctrine://default'
+                options: { queue_name: publish_instagram, auto_setup: false }
+                failure_transport: failed_publish
+                # 1 tentativo al minuto: copre anche il polling dello stato del container (max ~5 min)
+                retry_strategy: { max_retries: 6, delay: 60000, multiplier: 1 }
+
+            # Generazione testo via LLM (worker dedicato: richieste lente non bloccano le pubblicazioni)
+            llm:
+                dsn: 'doctrine://default'
+                options: { queue_name: llm, auto_setup: false }
+                failure_transport: failed_llm
+                retry_strategy: { max_retries: 3, delay: 5000, multiplier: 3 }
+
+            failed_async:
+                dsn: 'doctrine://default'
+                options: { queue_name: failed_async, auto_setup: false }
+            failed_publish:
+                dsn: 'doctrine://default'
+                options: { queue_name: failed_publish, auto_setup: false }
+            failed_llm:
+                dsn: 'doctrine://default'
+                options: { queue_name: failed_llm, auto_setup: false }
+
+        routing:
+            App\Message\ClaimDueChunk: async
+            App\Message\GenerateText: llm
+            App\Message\PublishPost: publish_instagram   # sovrascritto con TransportNamesStamp per piattaforma
